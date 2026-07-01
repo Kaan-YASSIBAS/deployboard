@@ -40,6 +40,22 @@ class MonitorService:
 
         self._monitors[monitor_id] = updated_monitor
         return updated_monitor
+    
+    def update_monitor_status(self, monitor_id: str, status) -> Monitor | None:
+        monitor = self._monitors.get(monitor_id)
+
+        if monitor is None:
+            return None
+
+        updated_monitor = monitor.model_copy(
+            update={
+                "status": status,
+                "updated_at": datetime.now(timezone.utc),
+            }
+        )
+
+        self._monitors[monitor_id] = updated_monitor
+        return updated_monitor
 
     def delete_monitor(self, monitor_id: str) -> bool:
         if monitor_id not in self._monitors:
