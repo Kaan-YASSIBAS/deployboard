@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployboard-frontend
+  namespace: deployboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: deployboard-frontend
+  template:
+    metadata:
+      labels:
+        app: deployboard-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/kaan-yassibas/deployboard-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: deployboard-backend
+  namespace: deployboard
+spec:
+  type: ClusterIP
+  selector:
+    app: deployboard-backend
+  ports:
+    - port: 8000
+      targetPort: 8000
