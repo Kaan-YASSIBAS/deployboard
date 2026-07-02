@@ -22,6 +22,8 @@ class Settings(BaseModel):
     )
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
     jwt_expire_minutes: int = int(os.getenv("JWT_EXPIRE_MINUTES", "1440"))
+    max_monitors_per_user: int = int(os.getenv("MAX_MONITORS_PER_USER", "5"))
+    check_history_ttl_days: int = int(os.getenv("CHECK_HISTORY_TTL_DAYS", "30"))
 
     dynamodb_users_table: str = os.getenv(
         "DYNAMODB_USERS_TABLE",

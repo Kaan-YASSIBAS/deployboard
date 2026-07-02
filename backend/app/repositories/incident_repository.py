@@ -1,5 +1,7 @@
 from typing import List, Optional
 
+from boto3.dynamodb.conditions import Key
+
 from app.models.incident import Incident, IncidentStatus
 from app.repositories.dynamodb import get_incidents_table
 
@@ -8,14 +10,19 @@ class IncidentRepository:
     def __init__(self) -> None:
         self._table = get_incidents_table()
 
-    def list_incidents(self) -> List[Incident]:
+    def list_incidents(self, user_id: str) -> List[Incident]:
         items = []
-        response = self._table.scan()
+        response = self._table.query(
+            KeyConditionExpression=Key("user_id").eq(user_id),
+            ScanIndexForward=False,
+        )
 
         items.extend(response.get("Items", []))
 
         while "LastEvaluatedKey" in response:
-            response = self._table.scan(
+            response = self._table.query(
+                KeyConditionExpression=Key("user_id").eq(user_id),
+                ScanIndexForward=False,
                 ExclusiveStartKey=response["LastEvaluatedKey"],
             )
             items.extend(response.get("Items", []))
@@ -28,15 +35,19 @@ class IncidentRepository:
             reverse=True,
         )
 
-    def list_active_incidents(self) -> List[Incident]:
+    def list_active_incidents(self, user_id: str) -> List[Incident]:
         return [
             incident
-            for incident in self.list_incidents()
+            for incident in self.list_incidents(user_id)
             if incident.status == IncidentStatus.ACTIVE
         ]
 
-    def get_active_incident_for_monitor(self, monitor_id: str) -> Optional[Incident]:
-        for incident in self.list_active_incidents():
+    def get_active_incident_for_monitor(
+        self,
+        user_id: str,
+        monitor_id: str,
+    ) -> Optional[Incident]:
+        for incident in self.list_active_incidents(user_id):
             if incident.monitor_id == monitor_id:
                 return incident
 

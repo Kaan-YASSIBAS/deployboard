@@ -13,6 +13,7 @@ class IncidentStatus(str, Enum):
 
 class Incident(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
+    user_id: str | None = None
     monitor_id: str
     monitor_name: str
     monitor_url: str
