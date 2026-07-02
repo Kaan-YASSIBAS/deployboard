@@ -211,6 +211,139 @@ function AddMonitorForm({ onCreate, isCreating }) {
   );
 }
 
+function MonitorTable({
+  monitors,
+  checksByMonitor,
+  isLoading,
+  checkingMonitorId,
+  deletingMonitorId,
+  onCheck,
+  onEdit,
+  onDelete,
+  showCrudActions = false,
+}) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/70 shadow-xl shadow-slate-950/30">
+      <div className="border-b border-slate-800 px-6 py-5">
+        <h3 className="font-semibold text-white">Monitors</h3>
+        <p className="text-sm text-slate-500">
+          {showCrudActions
+            ? "Services currently tracked by DeployBoard"
+            : "Current service health and latest checks"}
+        </p>
+      </div>
+
+      <div className="overflow-x-auto">
+        {isLoading ? (
+          <div className="flex items-center gap-2 px-6 py-8 text-sm text-slate-400">
+            <Loader2 className="animate-spin" size={18} />
+            Loading monitors...
+          </div>
+        ) : monitors.length === 0 ? (
+          <div className="px-6 py-8 text-sm text-slate-500">
+            {showCrudActions
+              ? "No monitors yet. Add your first monitor above."
+              : "No monitors yet. Create your first monitor from the Monitors page."}
+          </div>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-900/70 text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-6 py-4">Service</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4">Expected</th>
+                <th className="px-6 py-4">Interval</th>
+                <th className="px-6 py-4">Latest response</th>
+                <th className="px-6 py-4">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {monitors.map((monitor) => {
+                const latestCheck = checksByMonitor[monitor.id]?.[0];
+
+                return (
+                  <tr key={monitor.id} className="hover:bg-slate-900/40">
+                    <td className="px-6 py-4">
+                      <p className="font-medium text-white">{monitor.name}</p>
+                      <p className="mt-1 text-xs text-slate-500">{monitor.url}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${statusBadge(
+                          monitor.status
+                        )}`}
+                      >
+                        {monitor.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-slate-300">
+                      {monitor.expected_status}
+                    </td>
+                    <td className="px-6 py-4 text-slate-300">
+                      {monitor.check_interval_seconds}s
+                    </td>
+                    <td className="px-6 py-4 text-slate-300">
+                      {latestCheck
+                        ? `${latestCheck.response_time_ms ?? "-"}ms / ${
+                            latestCheck.status_code ?? "ERR"
+                          }`
+                        : "-"}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onCheck(monitor.id)}
+                          disabled={checkingMonitorId === monitor.id}
+                          className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {checkingMonitorId === monitor.id ? (
+                            <Loader2 className="animate-spin" size={14} />
+                          ) : (
+                            <RefreshCw size={14} />
+                          )}
+                          Check
+                        </button>
+
+                        {showCrudActions && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => onEdit(monitor)}
+                              className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-900"
+                            >
+                              <Pencil size={14} />
+                              Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => onDelete(monitor)}
+                              disabled={deletingMonitorId === monitor.id}
+                              className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 px-3 py-2 text-xs font-semibold text-red-200 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {deletingMonitorId === monitor.id ? (
+                                <Loader2 className="animate-spin" size={14} />
+                              ) : (
+                                <Trash2 size={14} />
+                              )}
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [activeView, setActiveView] = useState("dashboard");
   const [monitors, setMonitors] = useState([]);
@@ -735,111 +868,28 @@ export default function App() {
               </div>
                 </div>
               </div>
+              <MonitorTable
+                monitors={monitors}
+                checksByMonitor={checksByMonitor}
+                isLoading={isLoading}
+                checkingMonitorId={checkingMonitorId}
+                onCheck={handleRunCheck}
+              />
             </>
           )}
 
           {activeView === "monitors" && (
-            <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/70 shadow-xl shadow-slate-950/30">
-            <div className="border-b border-slate-800 px-6 py-5">
-              <h3 className="font-semibold text-white">Monitors</h3>
-              <p className="text-sm text-slate-500">Services currently tracked by DeployBoard</p>
-            </div>
-
-            <div className="overflow-x-auto">
-              {isLoading ? (
-                <div className="flex items-center gap-2 px-6 py-8 text-sm text-slate-400">
-                  <Loader2 className="animate-spin" size={18} />
-                  Loading monitors...
-                </div>
-              ) : monitors.length === 0 ? (
-                <div className="px-6 py-8 text-sm text-slate-500">
-                  No monitors yet. Add your first monitor above.
-                </div>
-              ) : (
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-900/70 text-xs uppercase tracking-wide text-slate-500">
-                    <tr>
-                      <th className="px-6 py-4">Service</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4">Expected</th>
-                      <th className="px-6 py-4">Interval</th>
-                      <th className="px-6 py-4">Latest response</th>
-                      <th className="px-6 py-4">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {monitors.map((monitor) => {
-                      const latestCheck = checksByMonitor[monitor.id]?.[0];
-
-                      return (
-                        <tr key={monitor.id} className="hover:bg-slate-900/40">
-                          <td className="px-6 py-4">
-                            <p className="font-medium text-white">{monitor.name}</p>
-                            <p className="mt-1 text-xs text-slate-500">{monitor.url}</p>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusBadge(monitor.status)}`}>
-                              {monitor.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-slate-300">
-                            {monitor.expected_status}
-                          </td>
-                          <td className="px-6 py-4 text-slate-300">
-                            {monitor.check_interval_seconds}s
-                          </td>
-                          <td className="px-6 py-4 text-slate-300">
-                            {latestCheck
-                              ? `${latestCheck.response_time_ms ?? "-"}ms / ${
-                                  latestCheck.status_code ?? "ERR"
-                                }`
-                              : "-"}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                onClick={() => handleRunCheck(monitor.id)}
-                                disabled={checkingMonitorId === monitor.id}
-                                className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {checkingMonitorId === monitor.id ? (
-                                  <Loader2 className="animate-spin" size={14} />
-                                ) : (
-                                  <RefreshCw size={14} />
-                                )}
-                                Check
-                              </button>
-
-                              <button
-                                onClick={() => startEditMonitor(monitor)}
-                                className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-900"
-                              >
-                                <Pencil size={14} />
-                                Edit
-                              </button>
-
-                              <button
-                                onClick={() => handleDeleteMonitor(monitor)}
-                                disabled={deletingMonitorId === monitor.id}
-                                className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 px-3 py-2 text-xs font-semibold text-red-200 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {deletingMonitorId === monitor.id ? (
-                                  <Loader2 className="animate-spin" size={14} />
-                                ) : (
-                                  <Trash2 size={14} />
-                                )}
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
-            </div>
+            <MonitorTable
+              monitors={monitors}
+              checksByMonitor={checksByMonitor}
+              isLoading={isLoading}
+              checkingMonitorId={checkingMonitorId}
+              deletingMonitorId={deletingMonitorId}
+              onCheck={handleRunCheck}
+              onEdit={startEditMonitor}
+              onDelete={handleDeleteMonitor}
+              showCrudActions
+            />
           )}
 
           {activeView === "incidents" && (
