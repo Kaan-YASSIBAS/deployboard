@@ -1,0 +1,87 @@
+name: Build and Deploy DeployBoard
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  BACKEND_IMAGE: ghcr.io/kaan-yassibas/deployboard-backend
+  FRONTEND_IMAGE: ghcr.io/kaan-yassibas/deployboard-frontend
+
+jobs:
+  build-and-push:
+    name: Build and push Docker images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build backend image
+        run: |
+          docker build \
+            -t $BACKEND_IMAGE:latest \
+            -t $BACKEND_IMAGE:${{ github.sha }} \
+            ./backend
+
+      - name: Push backend image
+        run: |
+          docker push $BACKEND_IMAGE:latest
+          docker push $BACKEND_IMAGE:${{ github.sha }}
+
+      - name: Build frontend image
+        run: |
+          docker build \
+            -t $FRONTEND_IMAGE:latest \
+            -t $FRONTEND_IMAGE:${{ github.sha }} \
+            ./frontend
+
+      - name: Push frontend image
+        run: |
+          docker push $FRONTEND_IMAGE:latest
+          docker push $FRONTEND_IMAGE:${{ github.sha }}
+
+  deploy:
+    name: Deploy to k3s on EC2
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deployboard-key.pem
+          chmod 600 ~/.ssh/deployboard-key.pem
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy on EC2
+        run: |
+          ssh -i ~/.ssh/deployboard-key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e
+
+            if [ ! -d "$HOME/deployboard" ]; then
+              git clone https://github.com/Kaan-YASSIBAS/deployboard.git "$HOME/deployboard"
+            fi
+
+            cd "$HOME/deployboard"
+            git pull origin main
+
+            kubectl apply -f k8s/
+
+            kubectl rollout restart deployment/deployboard-backend -n deployboard
+            kubectl rollout restart deployment/deployboard-frontend -n deployboard
+
+            kubectl rollout status deployment/deployboard-backend -n deployboard
+            kubectl rollout status deployment/deployboard-frontend -n deployboard
+
+            kubectl get pods -n deployboard
+          EOF
