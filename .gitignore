@@ -1,17 +1,27 @@
 # Python
 __pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 *.py[cod]
 *.pyo
 *.pyd
 .env
+.env.*
+!.env.example
 .venv/
 venv/
 env/
+.coverage
+.coverage.*
+htmlcov/
 
 # Node
 node_modules/
 dist/
 build/
+.vite/
+coverage/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -21,6 +31,7 @@ yarn-error.log*
 Thumbs.db
 .vscode/
 .idea/
+.agents/
 
 # AWS / Secrets
 *.pem
@@ -38,3 +49,5 @@ kubeconfig*
 
 # Logs
 *.log
+logs/
+*.pid
