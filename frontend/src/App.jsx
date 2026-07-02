@@ -212,6 +212,14 @@ export default function App() {
 
   useEffect(() => {
     loadDashboard();
+
+    const intervalId = window.setInterval(() => {
+      loadDashboard();
+    }, 10000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   async function handleCreateMonitor(payload) {
