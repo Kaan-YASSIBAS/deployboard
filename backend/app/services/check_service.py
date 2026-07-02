@@ -2,16 +2,26 @@ import time
 
 import httpx
 
+from app.config import settings
 from app.models.check import CheckResult, CheckStatus
 from app.models.monitor import Monitor, MonitorStatus
+from app.repositories.check_repository import CheckRepository
 from app.services.incident_service import open_incident, resolve_incident
 
 
 class CheckService:
     def __init__(self) -> None:
         self._checks: dict[str, list[CheckResult]] = {}
+        self._repository = (
+            CheckRepository()
+            if settings.storage_backend == "dynamodb"
+            else None
+        )
 
     def list_checks_for_monitor(self, monitor_id: str) -> list[CheckResult]:
+        if self._repository:
+            return self._repository.list_checks_for_monitor(monitor_id)
+
         return self._checks.get(monitor_id, [])
 
     def run_check(self, monitor: Monitor) -> CheckResult:
@@ -61,12 +71,18 @@ class CheckService:
                 error=str(exc),
             )
 
-        self._checks.setdefault(monitor.id, []).insert(0, result)
-        self._checks[monitor.id] = self._checks[monitor.id][:20]
-
+        self._save_check(result)
         self._sync_incident_state(monitor, result)
 
         return result
+
+    def _save_check(self, result: CheckResult) -> None:
+        if self._repository:
+            self._repository.save_check(result)
+            return
+
+        self._checks.setdefault(result.monitor_id, []).insert(0, result)
+        self._checks[result.monitor_id] = self._checks[result.monitor_id][:20]
 
     def _sync_incident_state(self, monitor: Monitor, result: CheckResult) -> None:
         if result.status == CheckStatus.DOWN:
