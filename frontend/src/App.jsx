@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -204,7 +204,7 @@ export default function App() {
   const [selectedMonitorId, setSelectedMonitorId] = useState("");
   const [error, setError] = useState(null);
 
-  async function loadDashboard() {
+  const loadDashboard = useCallback(async () => {
     try {
       setError(null);
       const monitorList = await listMonitors();
@@ -226,19 +226,17 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    loadDashboard();
-
-    const intervalId = window.setInterval(() => {
-      loadDashboard();
-    }, 10000);
+    const initialLoadId = window.setTimeout(loadDashboard, 0);
+    const intervalId = window.setInterval(loadDashboard, 10000);
 
     return () => {
+      window.clearTimeout(initialLoadId);
       window.clearInterval(intervalId);
     };
-  }, []);
+  }, [loadDashboard]);
 
   async function handleCreateMonitor(payload) {
     try {
@@ -373,32 +371,30 @@ export default function App() {
     return { total, up, down, avgResponse };
   }, [monitors, checksByMonitor]);
 
-  const selectedMonitor = useMemo(() => {
-    return (
-      monitors.find((monitor) => monitor.id === selectedMonitorId) ||
-      monitors[0] ||
-      null
-    );
-  }, [monitors, selectedMonitorId]);
+  const selectedMonitor =
+    monitors.find((monitor) => monitor.id === selectedMonitorId) ||
+    monitors[0] ||
+    null;
 
-  const chartData = useMemo(() => {
-    const checks = checksByMonitor[selectedMonitor?.id] || [];
-
-    return checks
-      .slice()
-      .reverse()
-      .map((check) => ({
-        time: new Date(check.checked_at).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        response: check.response_time_ms || 0,
-      }));
-  }, [selectedMonitor, checksByMonitor]);
+  const selectedMonitorChecks = checksByMonitor[selectedMonitor?.id] || [];
+  const chartData = selectedMonitorChecks
+    .slice()
+    .reverse()
+    .map((check) => ({
+      time: new Date(check.checked_at).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      response: check.response_time_ms || 0,
+    }));
 
   const recentIncidents = useMemo(() => {
-    return incidents.slice(0, 3);
-  }, [incidents]);
+    const monitorIds = new Set(monitors.map((monitor) => monitor.id));
+
+    return incidents
+      .filter((incident) => monitorIds.has(incident.monitor_id))
+      .slice(0, 3);
+  }, [incidents, monitors]);
 
   return (
     <div className="min-h-screen text-slate-100">

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from app.config import settings
 from app.models.monitor import Monitor, MonitorCreate, MonitorUpdate
 from app.repositories.monitor_repository import MonitorRepository
+from app.services.incident_service import resolve_incident
 
 
 class MonitorService:
@@ -82,12 +83,18 @@ class MonitorService:
 
     def delete_monitor(self, monitor_id: str) -> bool:
         if self._repository:
-            return self._repository.delete_monitor(monitor_id)
+            deleted = self._repository.delete_monitor(monitor_id)
+        else:
+            if monitor_id not in self._monitors:
+                return False
 
-        if monitor_id not in self._monitors:
+            del self._monitors[monitor_id]
+            deleted = True
+
+        if not deleted:
             return False
 
-        del self._monitors[monitor_id]
+        resolve_incident(monitor_id)
         return True
 
 
