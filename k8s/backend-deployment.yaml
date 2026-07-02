@@ -26,9 +26,24 @@ spec:
               value: "dynamodb"
             - name: AWS_REGION
               value: "eu-north-1"
+            - name: DYNAMODB_USERS_TABLE
+              value: "deployboard-users"
             - name: DYNAMODB_MONITORS_TABLE
-              value: "deployboard-monitors"
+              value: "deployboard-monitors-v2"
             - name: DYNAMODB_CHECKS_TABLE
-              value: "deployboard-checks"
+              value: "deployboard-checks-v2"
             - name: DYNAMODB_INCIDENTS_TABLE
-              value: "deployboard-incidents"
+              value: "deployboard-incidents-v2"
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: deployboard-auth-secret
+                  key: JWT_SECRET_KEY
+            - name: JWT_ALGORITHM
+              value: "HS256"
+            - name: JWT_EXPIRE_MINUTES
+              value: "1440"
+            - name: MAX_MONITORS_PER_USER
+              value: "5"
+            - name: CHECK_HISTORY_TTL_DAYS
+              value: "30"
