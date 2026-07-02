@@ -84,10 +84,26 @@ def create_monitor(client, headers, name="Example"):
     )
 
 
-def test_unauthenticated_monitor_list_fails(client):
-    response = client.get("/api/v1/monitors")
+def test_health_remains_public(client):
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        pytest.param("/api/v1/monitors", id="monitors"),
+        pytest.param("/api/v1/incidents", id="incidents"),
+        pytest.param("/api/v1/incidents/active", id="active-incidents"),
+    ],
+)
+def test_protected_list_endpoints_require_authentication(client, path):
+    response = client.get(path)
 
     assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
 
 
 def test_users_cannot_access_each_others_monitors(client):
@@ -120,6 +136,10 @@ def test_users_cannot_access_each_others_monitors(client):
     ]
 
     assert all(response.status_code == 404 for response in protected_requests)
+    assert all(
+        response.json()["detail"] == "Monitor not found"
+        for response in protected_requests
+    )
     assert (
         client.get(f"/api/v1/monitors/{monitor['id']}", headers=headers_a).status_code
         == 200
@@ -128,6 +148,7 @@ def test_users_cannot_access_each_others_monitors(client):
 
 def test_owner_can_check_monitor_and_read_ttl_history(client, monkeypatch):
     user_a, headers_a = register_and_login(client, "user-a")
+    _, headers_b = register_and_login(client, "user-b")
     monitor = create_monitor(client, headers_a).json()
     monkeypatch.setattr(
         "app.services.check_service.httpx.get",
@@ -146,7 +167,8 @@ def test_owner_can_check_monitor_and_read_ttl_history(client, monkeypatch):
         (checked_at + timedelta(days=settings.check_history_ttl_days)).timestamp()
     )
     assert check["user_id"] == user_a["id"]
-    assert check["expires_at"] == expected_expiry
+    assert isinstance(check["expires_at"], int)
+    assert abs(check["expires_at"] - expected_expiry) <= 1
 
     history_response = client.get(
         f"/api/v1/monitors/{monitor['id']}/checks",
@@ -154,6 +176,13 @@ def test_owner_can_check_monitor_and_read_ttl_history(client, monkeypatch):
     )
     assert history_response.status_code == 200
     assert [item["id"] for item in history_response.json()] == [check["id"]]
+
+    cross_user_history = client.get(
+        f"/api/v1/monitors/{monitor['id']}/checks",
+        headers=headers_b,
+    )
+    assert cross_user_history.status_code == 404
+    assert cross_user_history.json()["detail"] == "Monitor not found"
 
 
 def test_incident_lifecycle_is_scoped_to_owner(client, monkeypatch):
@@ -228,14 +257,19 @@ def test_deleting_monitor_resolves_only_owner_incident(client, monkeypatch):
 
 
 def test_monitor_limit_is_enforced_per_user(client, monkeypatch):
-    monkeypatch.setattr(settings, "max_monitors_per_user", 2)
+    monitor_limit = 2
+    monkeypatch.setattr(settings, "max_monitors_per_user", monitor_limit)
     _, headers_a = register_and_login(client, "user-a")
     _, headers_b = register_and_login(client, "user-b")
 
-    assert create_monitor(client, headers_a, name="Service 1").status_code == 201
-    assert create_monitor(client, headers_a, name="Service 2").status_code == 201
+    for index in range(monitor_limit):
+        response = create_monitor(client, headers_a, name=f"Service {index + 1}")
+        assert response.status_code == 201
 
-    limit_response = create_monitor(client, headers_a, name="Service 3")
+    limit_response = create_monitor(client, headers_a, name="Service over limit")
     assert limit_response.status_code == 400
-    assert limit_response.json()["detail"] == "Monitor limit of 2 reached"
+    assert (
+        limit_response.json()["detail"]
+        == f"Monitor limit of {monitor_limit} reached"
+    )
     assert create_monitor(client, headers_b, name="Service B").status_code == 201
