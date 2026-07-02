@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -6,10 +6,12 @@ import {
   Clock3,
   Globe2,
   Loader2,
+  LogOut,
   Pencil,
   Plus,
   RefreshCw,
   Server,
+  ShieldCheck,
   Trash2,
 } from "lucide-react";
 import {
@@ -25,12 +27,17 @@ import {
 import {
   createMonitor,
   deleteMonitor,
+  getCurrentUser,
   listIncidents,
   listMonitorChecks,
   listMonitors,
+  loginUser,
+  registerUser,
   runMonitorCheck,
   updateMonitor,
 } from "./api/monitors";
+
+const TOKEN_STORAGE_KEY = "deployboard_access_token";
 
 const navigationItems = [
   { id: "dashboard", label: "Dashboard", icon: Server },
@@ -344,7 +351,173 @@ function MonitorTable({
   );
 }
 
+function AuthScreen({
+  onAuthenticate,
+  onClearError,
+  isSubmitting,
+  error,
+}) {
+  const [mode, setMode] = useState("login");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+
+  function selectMode(nextMode) {
+    setMode(nextMode);
+    onClearError();
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    await onAuthenticate(mode, { username, password });
+  }
+
+  return (
+    <main className="flex min-h-screen items-center justify-center px-6 py-12 text-slate-100">
+      <div className="w-full max-w-md">
+        <div className="mb-8 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500 text-white shadow-lg shadow-sky-950/50">
+            <Activity size={28} />
+          </div>
+          <h1 className="mt-5 text-3xl font-bold tracking-tight text-white">
+            DeployBoard
+          </h1>
+          <p className="mt-2 text-sm text-slate-400">
+            Your cloud-native uptime monitoring workspace
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-6 shadow-2xl shadow-slate-950/50 backdrop-blur">
+          <div className="grid grid-cols-2 rounded-xl bg-slate-900 p-1">
+            {[
+              ["login", "Login"],
+              ["register", "Register"],
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => selectMode(id)}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                  mode === id
+                    ? "bg-sky-500 text-white shadow-sm"
+                    : "text-slate-400 hover:text-slate-100"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-6">
+            <h2 className="text-xl font-semibold text-white">
+              {mode === "login" ? "Welcome back" : "Create your account"}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {mode === "login"
+                ? "Sign in to view your monitors and incidents."
+                : "Start with a private monitoring workspace."}
+            </p>
+          </div>
+
+          {error && (
+            <div
+              className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+              role="alert"
+            >
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+            <div>
+              <label
+                htmlFor="auth-username"
+                className="text-xs font-medium uppercase tracking-wide text-slate-500"
+              >
+                Username
+              </label>
+              <input
+                id="auth-username"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                required
+                minLength={3}
+                maxLength={32}
+                pattern="[a-z0-9_-]+"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-white outline-none ring-sky-500/40 placeholder:text-slate-600 focus:ring-2"
+                placeholder="your_username"
+              />
+              <p className="mt-2 text-xs text-slate-500">
+                3-32 characters: lowercase letters, numbers, underscore, or hyphen.
+              </p>
+            </div>
+
+            <div>
+              <label
+                htmlFor="auth-password"
+                className="text-xs font-medium uppercase tracking-wide text-slate-500"
+              >
+                Password
+              </label>
+              <input
+                id="auth-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                type="password"
+                minLength={8}
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-white outline-none ring-sky-500/40 placeholder:text-slate-600 focus:ring-2"
+                placeholder="Minimum 8 characters"
+              />
+              <p className="mt-2 text-xs text-slate-500">
+                Use at least 8 characters.
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-950/40 hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSubmitting ? (
+                <Loader2 className="animate-spin" size={18} />
+              ) : (
+                <ShieldCheck size={18} />
+              )}
+              {mode === "login" ? "Sign in" : "Create account"}
+            </button>
+          </form>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function AuthLoadingScreen() {
+  return (
+    <div className="flex min-h-screen items-center justify-center text-slate-300">
+      <div className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/80 px-5 py-4 shadow-xl shadow-slate-950/40">
+        <Loader2 className="animate-spin text-sky-400" size={20} />
+        Restoring your session...
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  const [accessToken, setAccessToken] = useState(() =>
+    window.localStorage.getItem(TOKEN_STORAGE_KEY)
+  );
+  const activeTokenRef = useRef(accessToken);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(() =>
+    Boolean(window.localStorage.getItem(TOKEN_STORAGE_KEY))
+  );
+  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
+  const [authError, setAuthError] = useState(null);
   const [activeView, setActiveView] = useState("dashboard");
   const [monitors, setMonitors] = useState([]);
   const [checksByMonitor, setChecksByMonitor] = useState({});
@@ -364,31 +537,124 @@ export default function App() {
   const [selectedMonitorId, setSelectedMonitorId] = useState("");
   const [error, setError] = useState(null);
 
+  const clearSession = useCallback(() => {
+    window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+    activeTokenRef.current = null;
+    setAccessToken(null);
+    setCurrentUser(null);
+    setMonitors([]);
+    setChecksByMonitor({});
+    setIncidents([]);
+    setActiveView("dashboard");
+    setEditingMonitorId(null);
+    setSelectedMonitorId("");
+    setCheckingMonitorId(null);
+    setDeletingMonitorId(null);
+    setError(null);
+    setIsLoading(true);
+    setIsAuthLoading(false);
+  }, []);
+
+  const handleProtectedError = useCallback(
+    (err) => {
+      if (err.status === 401 || err.status === 403) {
+        clearSession();
+        setAuthError("Your session expired. Please sign in again.");
+        return;
+      }
+
+      setError(err.message || "Something went wrong. Please try again.");
+    },
+    [clearSession]
+  );
+
+  useEffect(() => {
+    if (!accessToken || currentUser) {
+      return undefined;
+    }
+
+    let isCancelled = false;
+    const restoreSessionId = window.setTimeout(async () => {
+      try {
+        const user = await getCurrentUser(accessToken);
+
+        if (!isCancelled) {
+          setCurrentUser(user);
+          setAuthError(null);
+          setIsAuthLoading(false);
+        }
+      } catch (err) {
+        if (isCancelled) {
+          return;
+        }
+
+        if (err.status === 401 || err.status === 403) {
+          clearSession();
+          setAuthError("Your session expired. Please sign in again.");
+        } else {
+          setAuthError(err.message || "Unable to restore your session.");
+          setIsAuthLoading(false);
+        }
+      }
+    }, 0);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(restoreSessionId);
+    };
+  }, [accessToken, currentUser, clearSession]);
+
   const loadDashboard = useCallback(async () => {
+    if (!accessToken) {
+      return;
+    }
+
+    const requestToken = accessToken;
+
     try {
       setError(null);
-      const monitorList = await listMonitors();
+      const monitorList = await listMonitors(requestToken);
+
+      if (activeTokenRef.current !== requestToken) {
+        return;
+      }
+
       setMonitors(monitorList);
 
       const checkEntries = await Promise.all(
         monitorList.map(async (monitor) => {
-          const checks = await listMonitorChecks(monitor.id);
+          const checks = await listMonitorChecks(monitor.id, requestToken);
           return [monitor.id, checks];
         })
       );
 
+      if (activeTokenRef.current !== requestToken) {
+        return;
+      }
+
       setChecksByMonitor(Object.fromEntries(checkEntries));
 
-      const incidentList = await listIncidents();
+      const incidentList = await listIncidents(requestToken);
+
+      if (activeTokenRef.current !== requestToken) {
+        return;
+      }
+
       setIncidents(incidentList);
     } catch (err) {
-      setError(err.message);
+      handleProtectedError(err);
     } finally {
-      setIsLoading(false);
+      if (activeTokenRef.current === requestToken) {
+        setIsLoading(false);
+      }
     }
-  }, []);
+  }, [accessToken, handleProtectedError]);
 
   useEffect(() => {
+    if (!accessToken || !currentUser) {
+      return undefined;
+    }
+
     const initialLoadId = window.setTimeout(loadDashboard, 0);
     const intervalId = window.setInterval(loadDashboard, 10000);
 
@@ -396,16 +662,53 @@ export default function App() {
       window.clearTimeout(initialLoadId);
       window.clearInterval(intervalId);
     };
-  }, [loadDashboard]);
+  }, [accessToken, currentUser, loadDashboard]);
+
+  async function handleAuthenticate(mode, payload) {
+    try {
+      setIsAuthSubmitting(true);
+      setAuthError(null);
+
+      if (mode === "register") {
+        await registerUser(payload);
+      }
+
+      const tokenResponse = await loginUser(payload);
+      const token = tokenResponse.access_token;
+      window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      setIsAuthLoading(true);
+
+      const user = await getCurrentUser(token);
+      activeTokenRef.current = token;
+      setAccessToken(token);
+      setCurrentUser(user);
+      setIsLoading(true);
+      setIsAuthLoading(false);
+    } catch (err) {
+      window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+      activeTokenRef.current = null;
+      setAccessToken(null);
+      setCurrentUser(null);
+      setIsAuthLoading(false);
+      setAuthError(err.message || "Authentication failed. Please try again.");
+    } finally {
+      setIsAuthSubmitting(false);
+    }
+  }
+
+  function handleLogout() {
+    clearSession();
+    setAuthError(null);
+  }
 
   async function handleCreateMonitor(payload) {
     try {
       setIsCreating(true);
       setError(null);
-      await createMonitor(payload);
+      await createMonitor(payload, accessToken);
       await loadDashboard();
     } catch (err) {
-      setError(err.message);
+      handleProtectedError(err);
     } finally {
       setIsCreating(false);
     }
@@ -415,10 +718,10 @@ export default function App() {
     try {
       setCheckingMonitorId(monitorId);
       setError(null);
-      await runMonitorCheck(monitorId);
+      await runMonitorCheck(monitorId, accessToken);
       await loadDashboard();
     } catch (err) {
-      setError(err.message);
+      handleProtectedError(err);
     } finally {
       setCheckingMonitorId(null);
     }
@@ -462,17 +765,21 @@ export default function App() {
       setIsSavingEdit(true);
       setError(null);
 
-      await updateMonitor(editingMonitorId, {
-        name: editForm.name,
-        url: editForm.url,
-        expected_status: Number(editForm.expected_status),
-        check_interval_seconds: Number(editForm.check_interval_seconds),
-      });
+      await updateMonitor(
+        editingMonitorId,
+        {
+          name: editForm.name,
+          url: editForm.url,
+          expected_status: Number(editForm.expected_status),
+          check_interval_seconds: Number(editForm.check_interval_seconds),
+        },
+        accessToken
+      );
 
       cancelEditMonitor();
       await loadDashboard();
     } catch (err) {
-      setError(err.message);
+      handleProtectedError(err);
     } finally {
       setIsSavingEdit(false);
     }
@@ -491,7 +798,7 @@ export default function App() {
       setDeletingMonitorId(monitor.id);
       setError(null);
 
-      await deleteMonitor(monitor.id);
+      await deleteMonitor(monitor.id, accessToken);
 
       if (editingMonitorId === monitor.id) {
         cancelEditMonitor();
@@ -504,7 +811,7 @@ export default function App() {
 
       await loadDashboard();
     } catch (err) {
-      setError(err.message);
+      handleProtectedError(err);
     } finally {
       setDeletingMonitorId(null);
     }
@@ -557,9 +864,24 @@ export default function App() {
   const recentIncidents = visibleIncidents.slice(0, 3);
   const activeViewDetails = viewDetails[activeView];
 
+  if (isAuthLoading) {
+    return <AuthLoadingScreen />;
+  }
+
+  if (!currentUser) {
+    return (
+      <AuthScreen
+        onAuthenticate={handleAuthenticate}
+        onClearError={() => setAuthError(null)}
+        isSubmitting={isAuthSubmitting}
+        error={authError}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen text-slate-100">
-      <aside className="fixed left-0 top-0 hidden h-full w-64 border-r border-slate-800 bg-slate-950/80 p-6 backdrop-blur lg:block">
+      <aside className="fixed left-0 top-0 hidden h-full w-64 flex-col border-r border-slate-800 bg-slate-950/80 p-6 backdrop-blur lg:flex">
         <div className="flex items-center gap-3">
           <div className="rounded-xl bg-sky-500 p-2 text-white">
             <Activity size={22} />
@@ -592,6 +914,28 @@ export default function App() {
             );
           })}
         </nav>
+
+        <div className="mt-auto rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-sky-500/10 p-2 text-sky-300">
+              <ShieldCheck size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500">Signed in as</p>
+              <p className="truncate text-sm font-semibold text-slate-200">
+                {currentUser.username}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white"
+          >
+            <LogOut size={14} />
+            Logout
+          </button>
+        </div>
       </aside>
 
       <main className="lg:ml-64">
