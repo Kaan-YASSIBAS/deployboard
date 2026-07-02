@@ -444,6 +444,11 @@ function AuthScreen({
             </p>
           </div>
 
+          <div className="mt-5 flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
+            <AlertTriangle className="shrink-0" size={16} />
+            <p>Demo environment — do not use real passwords.</p>
+          </div>
+
           {(validationError || error) && (
             <div
               className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"

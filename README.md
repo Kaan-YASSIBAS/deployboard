@@ -19,15 +19,15 @@ The project is deployed on AWS EC2 with k3s and DynamoDB. Docker images are buil
 
 ## Screenshots
 
-Screenshots are not committed yet. The planned repository gallery will include:
+Screenshots are not committed yet. Future captures will be stored in `assets/screenshots/`; until then, these text placeholders intentionally avoid broken image links.
 
-| Dashboard | Monitors |
+| View | TODO |
 | --- | --- |
-| _Dashboard overview screenshot_ | _Monitor management screenshot_ |
-
-| Incidents | Authentication |
-| --- | --- |
-| _Incident history screenshot_ | _Login and registration screenshot_ |
+| Auth screen | _TODO: add the login and registration screen_ |
+| Dashboard | _TODO: add the monitoring overview and response chart_ |
+| Monitors | _TODO: add the monitor management table and form_ |
+| Incidents | _TODO: add active and resolved incident history_ |
+| Status Pages | _TODO: add the planned status-page preview_ |
 
 ## Tech stack
 
