@@ -6,9 +6,11 @@ import {
   Clock3,
   Globe2,
   Loader2,
+  Pencil,
   Plus,
   RefreshCw,
   Server,
+  Trash2,
 } from "lucide-react";
 import {
   Area,
@@ -22,10 +24,12 @@ import {
 
 import {
   createMonitor,
+  deleteMonitor,
   listIncidents,
   listMonitorChecks,
   listMonitors,
   runMonitorCheck,
+  updateMonitor,
 } from "./api/monitors";
 
 function statusBadge(status) {
@@ -171,6 +175,15 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [checkingMonitorId, setCheckingMonitorId] = useState(null);
+  const [editingMonitorId, setEditingMonitorId] = useState(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    url: "",
+    expected_status: 200,
+    check_interval_seconds: 300,
+  });
+  const [deletingMonitorId, setDeletingMonitorId] = useState(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [error, setError] = useState(null);
 
   async function loadDashboard() {
@@ -190,7 +203,6 @@ export default function App() {
 
       const incidentList = await listIncidents();
       setIncidents(incidentList);
-
     } catch (err) {
       setError(err.message);
     } finally {
@@ -225,6 +237,87 @@ export default function App() {
       setError(err.message);
     } finally {
       setCheckingMonitorId(null);
+    }
+  }
+
+  function startEditMonitor(monitor) {
+    setEditingMonitorId(monitor.id);
+    setEditForm({
+      name: monitor.name,
+      url: monitor.url,
+      expected_status: monitor.expected_status,
+      check_interval_seconds: monitor.check_interval_seconds,
+    });
+  }
+
+  function cancelEditMonitor() {
+    setEditingMonitorId(null);
+    setEditForm({
+      name: "",
+      url: "",
+      expected_status: 200,
+      check_interval_seconds: 300,
+    });
+  }
+
+  function updateEditField(field, value) {
+    setEditForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  async function handleUpdateMonitor(event) {
+    event.preventDefault();
+
+    if (!editingMonitorId) {
+      return;
+    }
+
+    try {
+      setIsSavingEdit(true);
+      setError(null);
+
+      await updateMonitor(editingMonitorId, {
+        name: editForm.name,
+        url: editForm.url,
+        expected_status: Number(editForm.expected_status),
+        check_interval_seconds: Number(editForm.check_interval_seconds),
+      });
+
+      cancelEditMonitor();
+      await loadDashboard();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
+  async function handleDeleteMonitor(monitor) {
+    const confirmed = window.confirm(
+      `Delete monitor "${monitor.name}"? This action cannot be undone.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingMonitorId(monitor.id);
+      setError(null);
+
+      await deleteMonitor(monitor.id);
+
+      if (editingMonitorId === monitor.id) {
+        cancelEditMonitor();
+      }
+
+      await loadDashboard();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingMonitorId(null);
     }
   }
 
@@ -333,6 +426,110 @@ export default function App() {
           )}
 
           <AddMonitorForm onCreate={handleCreateMonitor} isCreating={isCreating} />
+
+          {editingMonitorId && (
+            <form
+              onSubmit={handleUpdateMonitor}
+              className="rounded-2xl border border-sky-500/30 bg-sky-500/10 p-6 shadow-xl shadow-slate-950/30"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-white">Edit monitor</h3>
+                  <p className="text-sm text-slate-400">
+                    Update monitor configuration.
+                  </p>
+                </div>
+                <div className="rounded-xl bg-sky-500/10 p-2 text-sky-300">
+                  <Pencil size={20} />
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-4">
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Name
+                  </label>
+                  <input
+                    value={editForm.name}
+                    onChange={(event) => updateEditField("name", event.target.value)}
+                    required
+                    minLength={2}
+                    className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none ring-sky-500/40 focus:ring-2"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    URL
+                  </label>
+                  <input
+                    value={editForm.url}
+                    onChange={(event) => updateEditField("url", event.target.value)}
+                    required
+                    type="url"
+                    className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none ring-sky-500/40 focus:ring-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Expected
+                  </label>
+                  <input
+                    value={editForm.expected_status}
+                    onChange={(event) =>
+                      updateEditField("expected_status", event.target.value)
+                    }
+                    required
+                    type="number"
+                    min={100}
+                    max={599}
+                    className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none ring-sky-500/40 focus:ring-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Interval seconds
+                  </label>
+                  <input
+                    value={editForm.check_interval_seconds}
+                    onChange={(event) =>
+                      updateEditField("check_interval_seconds", event.target.value)
+                    }
+                    required
+                    type="number"
+                    min={60}
+                    max={86400}
+                    className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none ring-sky-500/40 focus:ring-2"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 flex gap-3">
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-950/40 hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSavingEdit ? (
+                    <Loader2 className="animate-spin" size={18} />
+                  ) : (
+                    <Pencil size={18} />
+                  )}
+                  Save changes
+                </button>
+
+                <button
+                  type="button"
+                  onClick={cancelEditMonitor}
+                  className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-900"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <StatCard icon={Globe2} label="Total monitors" value={stats.total} helper="active" />
@@ -497,18 +694,41 @@ export default function App() {
                               : "-"}
                           </td>
                           <td className="px-6 py-4">
-                            <button
-                              onClick={() => handleRunCheck(monitor.id)}
-                              disabled={checkingMonitorId === monitor.id}
-                              className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {checkingMonitorId === monitor.id ? (
-                                <Loader2 className="animate-spin" size={14} />
-                              ) : (
-                                <RefreshCw size={14} />
-                              )}
-                              Check
-                            </button>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={() => handleRunCheck(monitor.id)}
+                                disabled={checkingMonitorId === monitor.id}
+                                className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {checkingMonitorId === monitor.id ? (
+                                  <Loader2 className="animate-spin" size={14} />
+                                ) : (
+                                  <RefreshCw size={14} />
+                                )}
+                                Check
+                              </button>
+
+                              <button
+                                onClick={() => startEditMonitor(monitor)}
+                                className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-900"
+                              >
+                                <Pencil size={14} />
+                                Edit
+                              </button>
+
+                              <button
+                                onClick={() => handleDeleteMonitor(monitor)}
+                                disabled={deletingMonitorId === monitor.id}
+                                className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 px-3 py-2 text-xs font-semibold text-red-200 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {deletingMonitorId === monitor.id ? (
+                                  <Loader2 className="animate-spin" size={14} />
+                                ) : (
+                                  <Trash2 size={14} />
+                                )}
+                                Delete
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );

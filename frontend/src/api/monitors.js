@@ -32,6 +32,19 @@ export function createMonitor(payload) {
   });
 }
 
+export function updateMonitor(monitorId, payload) {
+  return request(`/api/v1/monitors/${monitorId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteMonitor(monitorId) {
+  return request(`/api/v1/monitors/${monitorId}`, {
+    method: "DELETE",
+  });
+}
+
 export function runMonitorCheck(monitorId) {
   return request(`/api/v1/monitors/${monitorId}/check`, {
     method: "POST",
