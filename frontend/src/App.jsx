@@ -360,15 +360,30 @@ function AuthScreen({
   const [mode, setMode] = useState("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [validationError, setValidationError] = useState(null);
 
   function selectMode(nextMode) {
     setMode(nextMode);
+    setConfirmPassword("");
+    setValidationError(null);
     onClearError();
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    await onAuthenticate(mode, { username, password });
+
+    if (mode === "register" && password !== confirmPassword) {
+      setValidationError("Passwords do not match.");
+      return;
+    }
+
+    setValidationError(null);
+    const authenticated = await onAuthenticate(mode, { username, password });
+
+    if (authenticated) {
+      setConfirmPassword("");
+    }
   }
 
   return (
@@ -418,12 +433,12 @@ function AuthScreen({
             </p>
           </div>
 
-          {error && (
+          {(validationError || error) && (
             <div
               className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
               role="alert"
             >
-              {error}
+              {validationError || error}
             </div>
           )}
 
@@ -464,7 +479,10 @@ function AuthScreen({
               <input
                 id="auth-password"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  setValidationError(null);
+                }}
                 required
                 type="password"
                 minLength={8}
@@ -476,6 +494,31 @@ function AuthScreen({
                 Use at least 8 characters.
               </p>
             </div>
+
+            {mode === "register" && (
+              <div>
+                <label
+                  htmlFor="auth-confirm-password"
+                  className="text-xs font-medium uppercase tracking-wide text-slate-500"
+                >
+                  Confirm password
+                </label>
+                <input
+                  id="auth-confirm-password"
+                  value={confirmPassword}
+                  onChange={(event) => {
+                    setConfirmPassword(event.target.value);
+                    setValidationError(null);
+                  }}
+                  required
+                  type="password"
+                  minLength={8}
+                  autoComplete="new-password"
+                  className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-white outline-none ring-sky-500/40 placeholder:text-slate-600 focus:ring-2"
+                  placeholder="Re-enter your password"
+                />
+              </div>
+            )}
 
             <button
               type="submit"
@@ -684,6 +727,7 @@ export default function App() {
       setCurrentUser(user);
       setIsLoading(true);
       setIsAuthLoading(false);
+      return true;
     } catch (err) {
       window.localStorage.removeItem(TOKEN_STORAGE_KEY);
       activeTokenRef.current = null;
@@ -691,6 +735,7 @@ export default function App() {
       setCurrentUser(null);
       setIsAuthLoading(false);
       setAuthError(err.message || "Authentication failed. Please try again.");
+      return false;
     } finally {
       setIsAuthSubmitting(false);
     }
@@ -822,9 +867,8 @@ export default function App() {
     const up = monitors.filter((monitor) => monitor.status === "UP").length;
     const down = monitors.filter((monitor) => monitor.status === "DOWN").length;
 
-    const allChecks = Object.values(checksByMonitor).flat();
-    const responseTimes = allChecks
-      .map((check) => check.response_time_ms)
+    const responseTimes = monitors
+      .map((monitor) => checksByMonitor[monitor.id]?.[0]?.response_time_ms)
       .filter((value) => typeof value === "number");
 
     const avgResponse =
