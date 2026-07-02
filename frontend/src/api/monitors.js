@@ -41,3 +41,11 @@ export function runMonitorCheck(monitorId) {
 export function listMonitorChecks(monitorId) {
   return request(`/api/v1/monitors/${monitorId}/checks`);
 }
+
+export function listIncidents() {
+  return request("/api/v1/incidents");
+}
+
+export function listActiveIncidents() {
+  return request("/api/v1/incidents/active");
+}

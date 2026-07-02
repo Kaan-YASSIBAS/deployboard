@@ -22,6 +22,7 @@ import {
 
 import {
   createMonitor,
+  listIncidents,
   listMonitorChecks,
   listMonitors,
   runMonitorCheck,
@@ -166,6 +167,7 @@ function AddMonitorForm({ onCreate, isCreating }) {
 export default function App() {
   const [monitors, setMonitors] = useState([]);
   const [checksByMonitor, setChecksByMonitor] = useState({});
+  const [incidents, setIncidents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [checkingMonitorId, setCheckingMonitorId] = useState(null);
@@ -185,6 +187,10 @@ export default function App() {
       );
 
       setChecksByMonitor(Object.fromEntries(checkEntries));
+
+      const incidentList = await listIncidents();
+      setIncidents(incidentList);
+
     } catch (err) {
       setError(err.message);
     } finally {
@@ -265,11 +271,8 @@ export default function App() {
   }, [monitors, checksByMonitor]);
 
   const recentIncidents = useMemo(() => {
-    return Object.values(checksByMonitor)
-      .flat()
-      .filter((check) => check.status === "DOWN")
-      .slice(0, 3);
-  }, [checksByMonitor]);
+    return incidents.slice(0, 3);
+  }, [incidents]);
 
   return (
     <div className="min-h-screen text-slate-100">
@@ -384,7 +387,7 @@ export default function App() {
 
             <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-6 shadow-xl shadow-slate-950/30">
               <h3 className="font-semibold text-white">Recent incidents</h3>
-              <p className="mt-1 text-sm text-slate-500">Latest failed checks</p>
+              <p className="mt-1 text-sm text-slate-500">Latest monitor incidents</p>
 
               <div className="mt-6 space-y-4">
                 {recentIncidents.length === 0 ? (
@@ -397,20 +400,41 @@ export default function App() {
                     </p>
                   </div>
                 ) : (
-                  recentIncidents.map((incident) => (
-                    <div
-                      key={incident.id}
-                      className="rounded-xl border border-red-500/20 bg-red-500/10 p-4"
-                    >
-                      <p className="text-sm font-medium text-red-200">
-                        Monitor check failed
-                      </p>
-                      <p className="mt-1 text-xs text-red-200/70">
-                        {incident.error || `HTTP ${incident.status_code}`} ·{" "}
-                        {new Date(incident.checked_at).toLocaleTimeString()}
-                      </p>
-                    </div>
-                  ))
+                  recentIncidents.map((incident) => {
+                    const isActive = incident.status === "ACTIVE";
+
+                    return (
+                      <div
+                        key={incident.id}
+                        className={`rounded-xl border p-4 ${
+                          isActive
+                            ? "border-red-500/20 bg-red-500/10"
+                            : "border-emerald-500/20 bg-emerald-500/10"
+                        }`}
+                      >
+                        <p
+                          className={`text-sm font-medium ${
+                            isActive ? "text-red-200" : "text-emerald-200"
+                          }`}
+                        >
+                          {incident.monitor_name} · {incident.status}
+                        </p>
+                        <p
+                          className={`mt-1 text-xs ${
+                            isActive ? "text-red-200/70" : "text-emerald-200/70"
+                          }`}
+                        >
+                          {incident.last_error || `HTTP ${incident.last_status_code ?? "ERR"}`} ·{" "}
+                          Started {new Date(incident.started_at).toLocaleTimeString()}
+                        </p>
+                        {incident.resolved_at && (
+                          <p className="mt-1 text-xs text-emerald-200/70">
+                            Resolved {new Date(incident.resolved_at).toLocaleTimeString()}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
