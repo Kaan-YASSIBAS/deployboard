@@ -8,7 +8,7 @@ from app.services.monitor_service import monitor_service
 class SchedulerService:
     def __init__(self) -> None:
         self._task: asyncio.Task | None = None
-        self._last_checked_at: dict[str, datetime] = {}
+        self._last_checked_at: dict[tuple[str, str], datetime] = {}
 
     def start(self) -> None:
         if self._task is None or self._task.done():
@@ -25,10 +25,14 @@ class SchedulerService:
 
     async def _check_due_monitors(self) -> None:
         now = datetime.now(timezone.utc)
-        monitors = monitor_service.list_monitors()
+        monitors = monitor_service.list_all_monitors()
 
         for monitor in monitors:
-            last_checked_at = self._last_checked_at.get(monitor.id)
+            if monitor.user_id is None:
+                continue
+
+            monitor_key = (monitor.user_id, monitor.id)
+            last_checked_at = self._last_checked_at.get(monitor_key)
 
             if last_checked_at is not None:
                 elapsed_seconds = (now - last_checked_at).total_seconds()
@@ -39,8 +43,12 @@ class SchedulerService:
             try:
                 result = await asyncio.to_thread(check_service.run_check, monitor)
                 monitor_status = check_status_to_monitor_status(result.status)
-                monitor_service.update_monitor_status(monitor.id, monitor_status)
-                self._last_checked_at[monitor.id] = now
+                monitor_service.update_monitor_status(
+                    monitor.user_id,
+                    monitor.id,
+                    monitor_status,
+                )
+                self._last_checked_at[monitor_key] = now
             except Exception as exc:
                 print(f"Scheduler failed to check monitor {monitor.id}: {exc}")
 

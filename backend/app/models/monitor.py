@@ -21,6 +21,7 @@ class MonitorCreate(BaseModel):
 
 class Monitor(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
+    user_id: str | None = None
     name: str
     url: HttpUrl
     expected_status: int = 200
