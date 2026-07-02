@@ -75,6 +75,8 @@ jobs:
             cd "$HOME/deployboard"
             git pull origin main
 
+            export KUBECONFIG="$HOME/.kube/config"
+
             kubectl apply -f k8s/
 
             kubectl rollout restart deployment/deployboard-backend -n deployboard
