@@ -32,6 +32,32 @@ import {
   updateMonitor,
 } from "./api/monitors";
 
+const navigationItems = [
+  { id: "dashboard", label: "Dashboard", icon: Server },
+  { id: "monitors", label: "Monitors", icon: Globe2 },
+  { id: "incidents", label: "Incidents", icon: AlertTriangle },
+  { id: "status-pages", label: "Status Pages", icon: Clock3 },
+];
+
+const viewDetails = {
+  dashboard: {
+    title: "Dashboard",
+    subtitle: "Cloud-native monitoring overview",
+  },
+  monitors: {
+    title: "Monitors",
+    subtitle: "Create, edit, check, and delete monitored services",
+  },
+  incidents: {
+    title: "Incidents",
+    subtitle: "Track active and resolved monitor incidents",
+  },
+  "status-pages": {
+    title: "Status Pages",
+    subtitle: "Share service health with your users",
+  },
+};
+
 function statusBadge(status) {
   if (status === "UP") {
     return "bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/30";
@@ -186,6 +212,7 @@ function AddMonitorForm({ onCreate, isCreating }) {
 }
 
 export default function App() {
+  const [activeView, setActiveView] = useState("dashboard");
   const [monitors, setMonitors] = useState([]);
   const [checksByMonitor, setChecksByMonitor] = useState({});
   const [incidents, setIncidents] = useState([]);
@@ -388,13 +415,14 @@ export default function App() {
       response: check.response_time_ms || 0,
     }));
 
-  const recentIncidents = useMemo(() => {
+  const visibleIncidents = useMemo(() => {
     const monitorIds = new Set(monitors.map((monitor) => monitor.id));
 
-    return incidents
-      .filter((incident) => monitorIds.has(incident.monitor_id))
-      .slice(0, 3);
+    return incidents.filter((incident) => monitorIds.has(incident.monitor_id));
   }, [incidents, monitors]);
+
+  const recentIncidents = visibleIncidents.slice(0, 3);
+  const activeViewDetails = viewDetails[activeView];
 
   return (
     <div className="min-h-screen text-slate-100">
@@ -410,22 +438,26 @@ export default function App() {
         </div>
 
         <nav className="mt-10 space-y-2 text-sm">
-          <a className="flex items-center gap-3 rounded-xl bg-sky-500/10 px-3 py-2 text-sky-300" href="#">
-            <Server size={18} />
-            Dashboard
-          </a>
-          <a className="flex items-center gap-3 rounded-xl px-3 py-2 text-slate-400 hover:bg-slate-900 hover:text-slate-100" href="#">
-            <Globe2 size={18} />
-            Monitors
-          </a>
-          <a className="flex items-center gap-3 rounded-xl px-3 py-2 text-slate-400 hover:bg-slate-900 hover:text-slate-100" href="#">
-            <AlertTriangle size={18} />
-            Incidents
-          </a>
-          <a className="flex items-center gap-3 rounded-xl px-3 py-2 text-slate-400 hover:bg-slate-900 hover:text-slate-100" href="#">
-            <Clock3 size={18} />
-            Status Pages
-          </a>
+          {navigationItems.map(({ id, label, icon: Icon }) => {
+            const isActive = activeView === id;
+
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveView(id)}
+                aria-current={isActive ? "page" : undefined}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors ${
+                  isActive
+                    ? "bg-sky-500/10 text-sky-300"
+                    : "text-slate-400 hover:bg-slate-900 hover:text-slate-100"
+                }`}
+              >
+                <Icon size={18} />
+                {label}
+              </button>
+            );
+          })}
         </nav>
       </aside>
 
@@ -433,8 +465,10 @@ export default function App() {
         <header className="border-b border-slate-800 bg-slate-950/50 px-6 py-5 backdrop-blur">
           <div className="mx-auto flex max-w-7xl items-center justify-between">
             <div>
-              <p className="text-sm text-slate-400">Cloud-native monitoring dashboard</p>
-              <h2 className="mt-1 text-2xl font-bold tracking-tight text-white">Dashboard</h2>
+              <p className="text-sm text-slate-400">{activeViewDetails.subtitle}</p>
+              <h2 className="mt-1 text-2xl font-bold tracking-tight text-white">
+                {activeViewDetails.title}
+              </h2>
             </div>
 
             <button
@@ -454,9 +488,11 @@ export default function App() {
             </div>
           )}
 
-          <AddMonitorForm onCreate={handleCreateMonitor} isCreating={isCreating} />
+          {activeView === "monitors" && (
+            <AddMonitorForm onCreate={handleCreateMonitor} isCreating={isCreating} />
+          )}
 
-          {editingMonitorId && (
+          {activeView === "monitors" && editingMonitorId && (
             <form
               onSubmit={handleUpdateMonitor}
               className="rounded-2xl border border-sky-500/30 bg-sky-500/10 p-6 shadow-xl shadow-slate-950/30"
@@ -560,15 +596,17 @@ export default function App() {
             </form>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard icon={Globe2} label="Total monitors" value={stats.total} helper="active" />
-            <StatCard icon={CheckCircle2} label="Services up" value={stats.up} helper="healthy" />
-            <StatCard icon={AlertTriangle} label="Services down" value={stats.down} helper="needs attention" />
-            <StatCard icon={Activity} label="Avg response" value={stats.avgResponse} helper="last checks" />
-          </div>
+          {activeView === "dashboard" && (
+            <>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <StatCard icon={Globe2} label="Total monitors" value={stats.total} helper="active" />
+                <StatCard icon={CheckCircle2} label="Services up" value={stats.up} helper="healthy" />
+                <StatCard icon={AlertTriangle} label="Services down" value={stats.down} helper="needs attention" />
+                <StatCard icon={Activity} label="Avg response" value={stats.avgResponse} helper="last checks" />
+              </div>
 
-          <div className="grid gap-6 xl:grid-cols-3">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-6 shadow-xl shadow-slate-950/30 xl:col-span-2">
+              <div className="grid gap-6 xl:grid-cols-3">
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-6 shadow-xl shadow-slate-950/30 xl:col-span-2">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h3 className="font-semibold text-white">Response time</h3>
@@ -643,7 +681,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-6 shadow-xl shadow-slate-950/30">
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-6 shadow-xl shadow-slate-950/30">
               <h3 className="font-semibold text-white">Recent incidents</h3>
               <p className="mt-1 text-sm text-slate-500">Latest monitor incidents</p>
 
@@ -695,10 +733,13 @@ export default function App() {
                   })
                 )}
               </div>
-            </div>
-          </div>
+                </div>
+              </div>
+            </>
+          )}
 
-          <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/70 shadow-xl shadow-slate-950/30">
+          {activeView === "monitors" && (
+            <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/70 shadow-xl shadow-slate-950/30">
             <div className="border-b border-slate-800 px-6 py-5">
               <h3 className="font-semibold text-white">Monitors</h3>
               <p className="text-sm text-slate-500">Services currently tracked by DeployBoard</p>
@@ -798,7 +839,121 @@ export default function App() {
                 </table>
               )}
             </div>
-          </div>
+            </div>
+          )}
+
+          {activeView === "incidents" && (
+            <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/70 shadow-xl shadow-slate-950/30">
+              <div className="border-b border-slate-800 px-6 py-5">
+                <h3 className="font-semibold text-white">Incident history</h3>
+                <p className="text-sm text-slate-500">
+                  Active and resolved incidents for current monitors
+                </p>
+              </div>
+
+              <div className="p-6">
+                {isLoading ? (
+                  <div className="flex items-center gap-2 py-4 text-sm text-slate-400">
+                    <Loader2 className="animate-spin" size={18} />
+                    Loading incidents...
+                  </div>
+                ) : visibleIncidents.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-800 px-6 py-12 text-center">
+                    <CheckCircle2 className="mx-auto text-emerald-400" size={28} />
+                    <p className="mt-3 text-sm font-medium text-slate-200">
+                      No incidents to show
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Active and resolved monitor incidents will appear here.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {visibleIncidents.map((incident) => {
+                      const isActive = incident.status === "ACTIVE";
+                      const incidentDetail = [
+                        incident.last_error,
+                        incident.last_status_code != null
+                          ? `HTTP ${incident.last_status_code}`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" / ") || "No error details available";
+
+                      return (
+                        <article
+                          key={incident.id}
+                          className="rounded-xl border border-slate-800 bg-slate-900/60 p-5"
+                        >
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <h4 className="font-medium text-white">
+                                {incident.monitor_name}
+                              </h4>
+                              {incident.monitor_url && (
+                                <p className="mt-1 break-all text-xs text-slate-500">
+                                  {incident.monitor_url}
+                                </p>
+                              )}
+                            </div>
+                            <span
+                              className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${
+                                isActive
+                                  ? "bg-red-500/10 text-red-300 ring-1 ring-red-500/30"
+                                  : "bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/30"
+                              }`}
+                            >
+                              {incident.status}
+                            </span>
+                          </div>
+
+                          <div className="mt-5 grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-3">
+                            <div>
+                              <p className="text-xs uppercase tracking-wide text-slate-500">
+                                Details
+                              </p>
+                              <p className="mt-1 text-slate-300">{incidentDetail}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-wide text-slate-500">
+                                Started
+                              </p>
+                              <p className="mt-1 text-slate-300">
+                                {new Date(incident.started_at).toLocaleString()}
+                              </p>
+                            </div>
+                            {incident.resolved_at && (
+                              <div>
+                                <p className="text-xs uppercase tracking-wide text-slate-500">
+                                  Resolved
+                                </p>
+                                <p className="mt-1 text-slate-300">
+                                  {new Date(incident.resolved_at).toLocaleString()}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeView === "status-pages" && (
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-6 py-16 text-center shadow-xl shadow-slate-950/30">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-300">
+                <Clock3 size={24} />
+              </div>
+              <h3 className="mt-5 text-lg font-semibold text-white">Status Pages</h3>
+              <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                Public status pages are coming soon. You will be able to publish
+                uptime and incident history for selected monitors.
+              </p>
+            </div>
+          )}
         </section>
       </main>
     </div>
