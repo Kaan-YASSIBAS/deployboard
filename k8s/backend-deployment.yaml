@@ -22,3 +22,13 @@ spec:
           env:
             - name: ENVIRONMENT
               value: "production"
+            - name: STORAGE_BACKEND
+              value: "dynamodb"
+            - name: AWS_REGION
+              value: "eu-north-1"
+            - name: DYNAMODB_MONITORS_TABLE
+              value: "deployboard-monitors"
+            - name: DYNAMODB_CHECKS_TABLE
+              value: "deployboard-checks"
+            - name: DYNAMODB_INCIDENTS_TABLE
+              value: "deployboard-incidents"
