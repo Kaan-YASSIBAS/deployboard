@@ -4,6 +4,7 @@ import httpx
 
 from app.models.check import CheckResult, CheckStatus
 from app.models.monitor import Monitor, MonitorStatus
+from app.services.incident_service import open_incident, resolve_incident
 
 
 class CheckService:
@@ -63,7 +64,20 @@ class CheckService:
         self._checks.setdefault(monitor.id, []).insert(0, result)
         self._checks[monitor.id] = self._checks[monitor.id][:20]
 
+        self._sync_incident_state(monitor, result)
+
         return result
+
+    def _sync_incident_state(self, monitor: Monitor, result: CheckResult) -> None:
+        if result.status == CheckStatus.DOWN:
+            open_incident(
+                monitor=monitor,
+                error=result.error,
+                status_code=result.status_code,
+            )
+            return
+
+        resolve_incident(monitor_id=monitor.id)
 
 
 check_service = CheckService()
