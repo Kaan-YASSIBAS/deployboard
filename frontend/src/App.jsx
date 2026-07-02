@@ -111,7 +111,7 @@ function AddMonitorForm({ onCreate, isCreating }) {
         </div>
       </div>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-4">
+      <div className="mt-5 grid gap-4 md:grid-cols-5">
         <div className="md:col-span-1">
           <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
             Name
@@ -154,6 +154,23 @@ function AddMonitorForm({ onCreate, isCreating }) {
             className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none ring-sky-500/40 focus:ring-2"
           />
         </div>
+
+        <div>
+          <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Interval seconds
+          </label>
+          <input
+            value={form.check_interval_seconds}
+            onChange={(event) =>
+              updateField("check_interval_seconds", event.target.value)
+            }
+            required
+            type="number"
+            min={60}
+            max={86400}
+            className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none ring-sky-500/40 focus:ring-2"
+          />
+        </div>
       </div>
 
       <button
@@ -184,6 +201,7 @@ export default function App() {
   });
   const [deletingMonitorId, setDeletingMonitorId] = useState(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [selectedMonitorId, setSelectedMonitorId] = useState("");
   const [error, setError] = useState(null);
 
   async function loadDashboard() {
@@ -321,6 +339,11 @@ export default function App() {
         cancelEditMonitor();
       }
 
+      if (selectedMonitor?.id === monitor.id) {
+        const nextMonitor = monitors.find((item) => item.id !== monitor.id);
+        setSelectedMonitorId(nextMonitor?.id || "");
+      }
+
       await loadDashboard();
     } catch (err) {
       setError(err.message);
@@ -350,14 +373,16 @@ export default function App() {
     return { total, up, down, avgResponse };
   }, [monitors, checksByMonitor]);
 
+  const selectedMonitor = useMemo(() => {
+    return (
+      monitors.find((monitor) => monitor.id === selectedMonitorId) ||
+      monitors[0] ||
+      null
+    );
+  }, [monitors, selectedMonitorId]);
+
   const chartData = useMemo(() => {
-    const firstMonitor = monitors[0];
-
-    if (!firstMonitor) {
-      return [];
-    }
-
-    const checks = checksByMonitor[firstMonitor.id] || [];
+    const checks = checksByMonitor[selectedMonitor?.id] || [];
 
     return checks
       .slice()
@@ -369,7 +394,7 @@ export default function App() {
         }),
         response: check.response_time_ms || 0,
       }));
-  }, [monitors, checksByMonitor]);
+  }, [selectedMonitor, checksByMonitor]);
 
   const recentIncidents = useMemo(() => {
     return incidents.slice(0, 3);
@@ -548,17 +573,49 @@ export default function App() {
 
           <div className="grid gap-6 xl:grid-cols-3">
             <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-6 shadow-xl shadow-slate-950/30 xl:col-span-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h3 className="font-semibold text-white">Response time</h3>
                   <p className="text-sm text-slate-500">
-                    Latest checks for the first monitor
+                    {selectedMonitor
+                      ? `Latest checks for ${selectedMonitor.name}`
+                      : "Latest monitor check history"}
                   </p>
+                </div>
+
+                <div className="sm:min-w-56">
+                  <label
+                    htmlFor="response-time-monitor"
+                    className="sr-only"
+                  >
+                    Select monitor for response time chart
+                  </label>
+                  <select
+                    id="response-time-monitor"
+                    value={selectedMonitor?.id || ""}
+                    onChange={(event) => setSelectedMonitorId(event.target.value)}
+                    disabled={monitors.length === 0}
+                    className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none ring-sky-500/40 focus:ring-2 disabled:cursor-not-allowed disabled:text-slate-500"
+                  >
+                    {monitors.length === 0 ? (
+                      <option value="">No monitors available</option>
+                    ) : (
+                      monitors.map((monitor) => (
+                        <option key={monitor.id} value={monitor.id}>
+                          {monitor.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
                 </div>
               </div>
 
               <div className="mt-6 h-72">
-                {chartData.length === 0 ? (
+                {monitors.length === 0 ? (
+                  <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-800 px-6 text-center text-sm text-slate-500">
+                    Add a monitor to start tracking response times.
+                  </div>
+                ) : chartData.length === 0 ? (
                   <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-800 text-sm text-slate-500">
                     Run a check to see response time data.
                   </div>
