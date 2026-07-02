@@ -19,15 +19,25 @@ The project is deployed on AWS EC2 with k3s and DynamoDB. Docker images are buil
 
 ## Screenshots
 
-Screenshots are not committed yet. Future captures will be stored in `assets/screenshots/`; until then, these text placeholders intentionally avoid broken image links.
+### Authentication
 
-| View | TODO |
-| --- | --- |
-| Auth screen | _TODO: add the login and registration screen_ |
-| Dashboard | _TODO: add the monitoring overview and response chart_ |
-| Monitors | _TODO: add the monitor management table and form_ |
-| Incidents | _TODO: add active and resolved incident history_ |
-| Status Pages | _TODO: add the planned status-page preview_ |
+![DeployBoard authentication screen with login and registration](assets/screenshots/auth.png)
+
+### Dashboard
+
+![DeployBoard monitoring dashboard with service statistics and response-time chart](assets/screenshots/dashboard.png)
+
+### Monitors
+
+![DeployBoard monitor management view with service configuration and actions](assets/screenshots/monitors.png)
+
+### Incidents
+
+![DeployBoard incident history showing active and resolved monitor incidents](assets/screenshots/incidents.png)
+
+### Status Pages
+
+![DeployBoard public status pages feature preview](assets/screenshots/status-pages.png)
 
 ## Tech stack
 
@@ -110,12 +120,16 @@ Local development defaults to in-memory repositories. Production selects DynamoD
 ## Incident lifecycle
 
 ```mermaid
-stateDiagram-v2
-    [*] --> ACTIVE: DOWN check with no active incident
-    ACTIVE --> ACTIVE: repeated DOWN updates failure details
-    ACTIVE --> RESOLVED: UP check
-    ACTIVE --> RESOLVED: owner deletes monitor
-    RESOLVED --> [*]
+flowchart TD
+    Down["DOWN check"] --> Existing{"ACTIVE incident exists?"}
+    Existing -- No --> Open["Open ACTIVE incident"]
+    Existing -- Yes --> Update["Update failure details<br/>Do not create a duplicate"]
+    Open --> Active["ACTIVE incident"]
+    Update --> Active
+    Active --> Up["UP check"]
+    Active --> Delete["Owner deletes monitor"]
+    Up --> Resolved["Resolve incident as RESOLVED"]
+    Delete --> Resolved
 ```
 
 Only one active incident is kept for a monitor at a time. Repeated failures update the current incident rather than creating duplicates, while recovery preserves the resolved incident as history.
