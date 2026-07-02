@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import incidents, monitors
+from app.routers import auth, incidents, monitors
 from app.services.scheduler_service import scheduler_service
 
 
@@ -29,6 +29,7 @@ app.add_middleware(
 )
 
 
+app.include_router(auth.router)
 app.include_router(monitors.router)
 app.include_router(incidents.router)
 
