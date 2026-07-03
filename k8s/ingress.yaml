@@ -5,6 +5,8 @@ metadata:
   namespace: deployboard
 spec:
   ingressClassName: traefik
+  tls:
+    - secretName: deployboard-tls-selfsigned
   rules:
     - http:
         paths:
