@@ -6,9 +6,9 @@ The project is deployed on AWS EC2 with k3s and DynamoDB. Docker images are buil
 
 > **Production milestone:** the multi-user release is live in `eu-north-1`, with authenticated and user-isolated monitors, checks, and incidents.
 
-**Live demo:** [http://13.63.178.195](http://13.63.178.195)
+**Live demo:** [https://13.63.178.195/](https://13.63.178.195/)
 
-> **Demo note:** This temporary portfolio endpoint currently runs over HTTP. HTTPS and a custom domain are planned.
+> **Demo note:** This temporary portfolio demo uses a self-signed TLS certificate. Your browser may show a security warning. A custom domain with a trusted HTTPS certificate is on the roadmap.
 
 ## Feature overview
 
